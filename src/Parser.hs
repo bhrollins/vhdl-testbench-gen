@@ -108,19 +108,17 @@ vhdlParser = VhdlFile <$> entityName <*> generics <*> ports
         portDirection = spaces *> many1 alphaNum <* spaces
 
         portType :: Parser String
-        portType = spaces *> basicType <> vector <* spaces
+        portType = spaces *> basicType <* spaces
             where
                 basicType :: Parser String
-                basicType = many1 (alphaNum <|> char '_')
-
-                vector :: Parser String
-                vector = option "" $ try (spaces *> parens)
-        
-        parens :: Parser String
-        parens = string "(" <> anyStringTill (lookAhead $ char ')') <> string ")"
+                basicType = many1 (alphaNum <|> oneOf " -*/'_()")
 
         portValue :: Parser (Maybe String)
         portValue = optionalParse $ spaces *> string ":=" *> spaces *> (parens <|> value)
             where
                 value :: Parser String
-                value = many (alphaNum <|> oneOf " -*/''=>_")
+                value = many (alphaNum <|> oneOf " -*/'=>_()")
+
+                -- @todo support nested parens
+                parens :: Parser String
+                parens = string "(" <> anyStringTill (lookAhead $ char ')') <> string ")"
