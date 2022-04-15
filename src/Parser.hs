@@ -123,4 +123,4 @@ vhdlParser = VhdlFile <$> entityName <*> generics <*> ports
         portValue = optionalParse $ spaces *> string ":=" *> spaces *> (parens <|> value)
             where
                 value :: Parser String
-                value = many (alphaNum <|> oneOf " -*/''=>")
+                value = many (alphaNum <|> oneOf " -*/''=>_")
