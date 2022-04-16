@@ -111,13 +111,13 @@ vhdlParser = VhdlFile <$> entityName <*> generics <*> ports
         portType = spaces *> basicType <* spaces
             where
                 basicType :: Parser String
-                basicType = many1 (alphaNum <|> oneOf " -*/'_()")
+                basicType = many1 (alphaNum <|> oneOf " +-*/'_()")
 
         portValue :: Parser (Maybe String)
         portValue = optionalParse $ spaces *> string ":=" *> spaces *> (parens <|> value)
             where
                 value :: Parser String
-                value = many (alphaNum <|> oneOf " -*/'=>_()")
+                value = many (alphaNum <|> oneOf " +-*/'=>_()")
 
                 -- @todo support nested parens
                 parens :: Parser String
