@@ -8,7 +8,7 @@ import Data.Char (toUpper, toLower)
 import Data.Maybe (fromMaybe)
 import Control.Monad (replicateM)
 import Text.Parsec.Text
-import Text.Parsec hiding (spaces)
+import Text.Parsec
 import Control.Applicative hiding ((<|>), many, optional)
 
 {- case-insensitive parsers taken from https://stackoverflow.com/users/507803/heatsink's answer on
@@ -23,6 +23,27 @@ char' c = char (toLower c) <|> char (toUpper c)
 
 string' :: String -> Parser String
 string' s = try $ mapM char' s
+
+{- | 'Paren' is a  helper data type for parsing arbitrarily 
+     nested paren-wrapped vector definitions & default values
+ -}
+data Paren = Inside String | Wrapped [Paren]
+
+parens :: Parser String
+parens = collect <$> wrapped
+    where
+        collect :: Paren -> String
+        collect (Inside str)   = str
+        collect (Wrapped pars) = "(" ++ concatMap collect pars ++ ")"
+
+        parseParens :: Parser Paren
+        parseParens = inside <|> wrapped
+
+        inside :: Parser Paren
+        inside  = Inside <$> many1 (noneOf "()")
+
+        wrapped :: Parser Paren
+        wrapped = Wrapped <$> between (char '(') (char ')') (many parseParens)
 
 
 {- | 'vhdlParser' parses a plain text VHDL file into the psuedo AST
@@ -59,12 +80,6 @@ vhdlParser = VhdlFile <$> entityName <*> generics <*> ports
         anyStringTill :: Parser a -> Parser String
         anyStringTill = manyTill anyChar
 
-        spaces :: Parser ()
-        spaces = skipMany $ oneOf " \t\f\v"
-
-        spacesS :: Parser String
-        spacesS = many $ oneOf " \t\f\v"
-
         whitespace :: Parser ()
         whitespace = skipMany space
 
@@ -93,7 +108,7 @@ vhdlParser = VhdlFile <$> entityName <*> generics <*> ports
                 paramParser' = whitespace *> comments *> paramParser
 
                 paramSep :: Parser ()
-                paramSep = spaces *> char ';' *> optional newline
+                paramSep = char ';' *> optional newline
 
         portNames :: Parser [String]
         portNames = spaces *> sepEndBy1 name separator <* char ':'
@@ -108,17 +123,16 @@ vhdlParser = VhdlFile <$> entityName <*> generics <*> ports
         portDirection = spaces *> many1 alphaNum <* spaces
 
         portType :: Parser String
-        portType = spaces *> basicType <* spaces
+        portType = spaces *> basicType <> vector <* spaces
             where
                 basicType :: Parser String
-                basicType = many1 (alphaNum <|> oneOf " +-*/'_()")
+                basicType = many1 (alphaNum <|> char '_')
+
+                vector :: Parser String
+                vector = option "" parens
 
         portValue :: Parser (Maybe String)
         portValue = optionalParse $ spaces *> string ":=" *> spaces *> (parens <|> value)
             where
                 value :: Parser String
-                value = many (alphaNum <|> oneOf " +-*/'=>_()")
-
-                -- @todo support nested parens
-                parens :: Parser String
-                parens = string "(" <> anyStringTill (lookAhead $ char ')') <> string ")"
+                value = many (alphaNum <|> oneOf " '")
